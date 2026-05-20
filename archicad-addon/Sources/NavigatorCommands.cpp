@@ -687,3 +687,220 @@ GS::ObjectState FitInWindowCommand::Execute (const GS::ObjectState& parameters, 
 
     return CreateSuccessfulExecutionResult ();
 }
+
+CreateViewCommand::CreateViewCommand () :
+    CommandBase (CommonSchema::Used)
+{}
+
+GS::String CreateViewCommand::GetName () const
+{
+    return "CreateView";
+}
+
+GS::Optional<GS::UniString> CreateViewCommand::GetInputParametersSchema () const
+{
+    return R"({
+        "type": "object",
+        "properties": {
+            "name": {
+                "type": "string",
+                "description": "The name of the new view."
+            },
+            "saveZoom": {
+                "type": "boolean",
+                "description": "Whether to store the current zoom with the view. Defaults to true."
+            }
+        },
+        "additionalProperties": false,
+        "required": [
+            "name"
+        ]
+    })";
+}
+
+GS::Optional<GS::UniString> CreateViewCommand::GetResponseSchema () const
+{
+    return R"({
+        "type": "object",
+        "properties": {
+            "navigatorItemId": {
+                "$ref": "#/NavigatorItemId"
+            }
+        },
+        "additionalProperties": false,
+        "required": [
+            "navigatorItemId"
+        ]
+    })";
+}
+
+GS::ObjectState CreateViewCommand::Execute (const GS::ObjectState& parameters, GS::ProcessControl& /*processControl*/) const
+{
+    GS::UniString name;
+    if (!parameters.Get ("name", name)) {
+        return CreateFailedExecutionResult (APIERR_BADPARS, "Missing 'name' parameter.");
+    }
+
+    bool saveZoom = true;
+    parameters.Get ("saveZoom", saveZoom);
+
+    API_NavigatorItem navigatorItem = {};
+    GS::ucscpy (navigatorItem.uName, name.ToUStr ());
+    navigatorItem.mapId = API_PublicViewMap;
+
+    API_NavigatorView navigatorView = {};
+    navigatorView.saveZoom = saveZoom;
+
+    GSErrCode err = ACAPI_Navigator_NewNavigatorView (&navigatorItem, &navigatorView, nullptr, nullptr);
+    if (err != NoError) {
+        return CreateFailedExecutionResult (err, "Failed to create the view. The current window may not be a savable model view.");
+    }
+
+    GS::ObjectState response;
+    response.Add ("navigatorItemId", CreateIdObjectState ("navigatorItemId", navigatorItem.guid));
+    return response;
+}
+
+OpenViewCommand::OpenViewCommand () :
+    CommandBase (CommonSchema::Used)
+{}
+
+GS::String OpenViewCommand::GetName () const
+{
+    return "OpenView";
+}
+
+GS::Optional<GS::UniString> OpenViewCommand::GetInputParametersSchema () const
+{
+    return R"({
+        "type": "object",
+        "properties": {
+            "navigatorItemId": {
+                "$ref": "#/NavigatorItemId"
+            }
+        },
+        "additionalProperties": false,
+        "required": [
+            "navigatorItemId"
+        ]
+    })";
+}
+
+GS::Optional<GS::UniString> OpenViewCommand::GetResponseSchema () const
+{
+    return R"({
+        "$ref": "#/ExecutionResult"
+    })";
+}
+
+GS::ObjectState OpenViewCommand::Execute (const GS::ObjectState& parameters, GS::ProcessControl& /*processControl*/) const
+{
+    const GS::ObjectState* navigatorItemIdOS = parameters.Get ("navigatorItemId");
+    if (navigatorItemIdOS == nullptr) {
+        return CreateFailedExecutionResult (APIERR_BADPARS, "Missing 'navigatorItemId' parameter.");
+    }
+
+    API_Guid navGuid = GetGuidFromObjectState (*navigatorItemIdOS);
+    if (navGuid == APINULLGuid) {
+        return CreateFailedExecutionResult (APIERR_BADPARS, "navigatorItemId is corrupt or missing.");
+    }
+
+    API_NavigatorItem navigatorItem = {};
+    GSErrCode err = ACAPI_Navigator_GetNavigatorItem (&navGuid, &navigatorItem);
+    if (err != NoError) {
+        return CreateFailedExecutionResult (err, "Failed to get navigator item from guid.");
+    }
+
+    err = ACAPI_Database_ChangeCurrentDatabase (&navigatorItem.db);
+    return err == NoError
+        ? CreateSuccessfulExecutionResult ()
+        : CreateFailedExecutionResult (err, "Failed to activate the view's database.");
+}
+
+SetModelViewOptionsCommand::SetModelViewOptionsCommand () :
+    CommandBase (CommonSchema::Used)
+{}
+
+GS::String SetModelViewOptionsCommand::GetName () const
+{
+    return "SetModelViewOptions";
+}
+
+GS::Optional<GS::UniString> SetModelViewOptionsCommand::GetInputParametersSchema () const
+{
+    return R"({
+        "type": "object",
+        "properties": {
+            "modelViewOptionsName": {
+                "type": "string",
+                "description": "The name of an existing Model View Options attribute to apply to the current view."
+            }
+        },
+        "additionalProperties": false,
+        "required": [
+            "modelViewOptionsName"
+        ]
+    })";
+}
+
+GS::Optional<GS::UniString> SetModelViewOptionsCommand::GetResponseSchema () const
+{
+    return R"({
+        "$ref": "#/ExecutionResult"
+    })";
+}
+
+GS::ObjectState SetModelViewOptionsCommand::Execute (const GS::ObjectState& parameters, GS::ProcessControl& /*processControl*/) const
+{
+    GS::UniString targetName;
+    if (!parameters.Get ("modelViewOptionsName", targetName)) {
+        return CreateFailedExecutionResult (APIERR_BADPARS, "Missing 'modelViewOptionsName' parameter.");
+    }
+
+    short foundIndex = 0;
+    bool found = false;
+
+#ifdef ServerMainVers_2700
+    UInt32 count = 0;
+    ACAPI_Navigator_ModelViewOptions_GetNum (count);
+    for (UInt32 i = 1; i <= count && !found; ++i) {
+        GS::UniString name;
+        API_ModelViewOptionsType modelViewOption = {};
+        modelViewOption.head.index = i;
+        modelViewOption.head.uniStringNamePtr = &name;
+        if (ACAPI_Navigator_ModelViewOptions_Get (&modelViewOption) == NoError && name == targetName) {
+            foundIndex = (short) i;
+            found = true;
+        }
+    }
+#else
+    API_AttributeIndex count = 0;
+    ACAPI_Attribute_GetNum (API_ModelViewOptionsID, &count);
+    for (API_AttributeIndex i = 1; i <= count && !found; ++i) {
+        GS::UniString name;
+        API_Attribute attr = {};
+        attr.header.typeID = API_ModelViewOptionsID;
+        attr.header.index = i;
+        attr.header.uniStringNamePtr = &name;
+        if (ACAPI_Attribute_Get (&attr) == NoError && name == targetName) {
+            foundIndex = (short) i;
+            found = true;
+        }
+    }
+#endif
+
+    if (!found) {
+        return CreateFailedExecutionResult (APIERR_BADNAME, GS::UniString::Printf ("No Model View Options named '%T' found.", targetName.ToPrintf ()));
+    }
+
+    API_ViewOptions viewOptions = {};
+    GSErrCode err = ACAPI_Navigator_GetViewOptions (&viewOptions);
+    if (err != NoError) {
+        return CreateFailedExecutionResult (err, "Failed to read current view options.");
+    }
+
+    err = ACAPI_Navigator_ChangeViewOptions (&viewOptions, &foundIndex);
+    return err == NoError
+        ? CreateSuccessfulExecutionResult ()
+        : CreateFailedExecutionResult (err, "Failed to apply Model View Options.");
+}

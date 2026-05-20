@@ -32,6 +32,7 @@
 #include "FavoritesCommands.hpp"
 #include "MigrationHelper.hpp"
 #include "NavigatorCommands.hpp"
+#include "ProjectionCommands.hpp"
 #include "DocumentCreationCommands.hpp"
 #include "RevisionCommands.hpp"
 #include "NotificationCommands.hpp"
@@ -373,6 +374,10 @@ GSErrCode Initialize (void)
             elementCommands, "1.2.5",
             "Creates Label elements based on the given parameters."
         );
+        err |= RegisterCommand<CreateTextsCommand> (
+            elementCommands, "1.4.2",
+            "Creates standalone Text elements based on the given parameters."
+        );
         err |= RegisterCommand<ModifyWallsCommand> (
             elementCommands, "1.4.0",
             "Modifies Wall elements based on the given parameters."
@@ -639,6 +644,22 @@ GSErrCode Initialize (void)
         err |= RegisterCommand<FitInWindowCommand> (
             navigatorCommands, "1.3.1",
             "Zooms to the given elements or fits everything in the window."
+        );
+        err |= RegisterCommand<CreateViewCommand> (
+            navigatorCommands, "1.4.2",
+            "Saves the current window as a new View Map item."
+        );
+        err |= RegisterCommand<OpenViewCommand> (
+            navigatorCommands, "1.4.2",
+            "Activates a saved view by its navigator item id."
+        );
+        err |= RegisterCommand<SetModelViewOptionsCommand> (
+            navigatorCommands, "1.4.2",
+            "Applies a Model View Options set (by name) to the current view."
+        );
+        err |= RegisterCommand<Set3DProjectionCommand> (
+            navigatorCommands, "1.4.2",
+            "Sets the 3D perspective projection (camera and target positions)."
         );
         AddCommandGroup (navigatorCommands);
     }
