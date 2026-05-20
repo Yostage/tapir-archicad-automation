@@ -770,6 +770,7 @@ GS::ObjectState CreateViewCommand::Execute (const GS::ObjectState& parameters, G
     response.Add ("navigatorItemId", CreateGuidObjectState (navigatorItem.guid));
     return response;
 #else
+    (void) parameters;
     return CreateFailedExecutionResult (APIERR_GENERAL, "CreateView requires Archicad 29 or later.");
 #endif
 }
@@ -920,6 +921,7 @@ GS::ObjectState SetModelViewOptionsCommand::Execute (const GS::ObjectState& para
         ? CreateSuccessfulExecutionResult ()
         : CreateFailedExecutionResult (err, "Failed to apply Model View Options.");
 #else
+    (void) parameters;
     return CreateFailedExecutionResult (APIERR_GENERAL, "SetModelViewOptions requires Archicad 29 or later.");
 #endif
 }

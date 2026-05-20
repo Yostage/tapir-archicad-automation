@@ -102,6 +102,7 @@ GS::ObjectState Set3DProjectionCommand::Execute (const GS::ObjectState& paramete
         ? CreateSuccessfulExecutionResult ()
         : CreateFailedExecutionResult (err, "Failed to set the 3D projection.");
 #else
+    (void) parameters;
     return CreateFailedExecutionResult (APIERR_GENERAL, "Set3DProjection requires Archicad 29 or later.");
 #endif
 }
