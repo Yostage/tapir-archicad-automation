@@ -736,6 +736,9 @@ GS::Optional<GS::UniString> CreateViewCommand::GetResponseSchema () const
 
 GS::ObjectState CreateViewCommand::Execute (const GS::ObjectState& parameters, GS::ProcessControl& /*processControl*/) const
 {
+    // ACAPI_Navigator_NewNavigatorView is absent from older API DevKits.
+    // Verified on AC29; guard at 2900 so the all-versions CI matrix compiles.
+#if defined (ServerMainVers_2900)
     GS::UniString name;
     if (!parameters.Get ("name", name)) {
         return CreateFailedExecutionResult (APIERR_BADPARS, "Missing 'name' parameter.");
@@ -766,6 +769,9 @@ GS::ObjectState CreateViewCommand::Execute (const GS::ObjectState& parameters, G
     GS::ObjectState response;
     response.Add ("navigatorItemId", CreateGuidObjectState (navigatorItem.guid));
     return response;
+#else
+    return CreateFailedExecutionResult (APIERR_GENERAL, "CreateView requires Archicad 29 or later.");
+#endif
 }
 
 OpenViewCommand::OpenViewCommand () :
@@ -859,6 +865,9 @@ GS::Optional<GS::UniString> SetModelViewOptionsCommand::GetResponseSchema () con
 
 GS::ObjectState SetModelViewOptionsCommand::Execute (const GS::ObjectState& parameters, GS::ProcessControl& /*processControl*/) const
 {
+    // ACAPI_Navigator_Get/ChangeViewOptions are absent from older API DevKits.
+    // Verified on AC29; guard at 2900 so the all-versions CI matrix compiles.
+#if defined (ServerMainVers_2900)
     GS::UniString targetName;
     if (!parameters.Get ("modelViewOptionsName", targetName)) {
         return CreateFailedExecutionResult (APIERR_BADPARS, "Missing 'modelViewOptionsName' parameter.");
@@ -910,4 +919,7 @@ GS::ObjectState SetModelViewOptionsCommand::Execute (const GS::ObjectState& para
     return err == NoError
         ? CreateSuccessfulExecutionResult ()
         : CreateFailedExecutionResult (err, "Failed to apply Model View Options.");
+#else
+    return CreateFailedExecutionResult (APIERR_GENERAL, "SetModelViewOptions requires Archicad 29 or later.");
+#endif
 }
