@@ -51,6 +51,11 @@ GS::Optional<GS::UniString> Set3DProjectionCommand::GetResponseSchema () const
 
 GS::ObjectState Set3DProjectionCommand::Execute (const GS::ObjectState& parameters, GS::ProcessControl& /*processControl*/) const
 {
+    // ACAPI_View_Get/Change3DProjectionSets don't exist in older API DevKits
+    // (AC25 lacks them). Verified working on AC29; guard at 2900 so the
+    // all-versions CI matrix compiles. Lower the threshold once confirmed on
+    // an older DevKit if older support is wanted.
+#if defined (ServerMainVers_2900)
     const GS::ObjectState* cameraOS = parameters.Get ("cameraPosition");
     const GS::ObjectState* targetOS = parameters.Get ("targetPosition");
     if (cameraOS == nullptr || targetOS == nullptr) {
@@ -96,4 +101,7 @@ GS::ObjectState Set3DProjectionCommand::Execute (const GS::ObjectState& paramete
     return err == NoError
         ? CreateSuccessfulExecutionResult ()
         : CreateFailedExecutionResult (err, "Failed to set the 3D projection.");
+#else
+    return CreateFailedExecutionResult (APIERR_GENERAL, "Set3DProjection requires Archicad 29 or later.");
+#endif
 }
