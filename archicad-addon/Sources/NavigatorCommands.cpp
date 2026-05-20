@@ -720,6 +720,9 @@ GS::Optional<GS::UniString> CreateViewCommand::GetInputParametersSchema () const
 
 GS::Optional<GS::UniString> CreateViewCommand::GetResponseSchema () const
 {
+    // Permissive: success returns navigatorItemId; failure returns an
+    // ExecutionResult-style error. additionalProperties must stay true so the
+    // error shape doesn't trip response-schema validation.
     return R"({
         "type": "object",
         "properties": {
@@ -727,10 +730,7 @@ GS::Optional<GS::UniString> CreateViewCommand::GetResponseSchema () const
                 "$ref": "#/NavigatorItemId"
             }
         },
-        "additionalProperties": false,
-        "required": [
-            "navigatorItemId"
-        ]
+        "additionalProperties": true
     })";
 }
 
@@ -748,16 +748,23 @@ GS::ObjectState CreateViewCommand::Execute (const GS::ObjectState& parameters, G
     GS::ucscpy (navigatorItem.uName, name.ToUStr ());
     navigatorItem.mapId = API_PublicViewMap;
 
+    // The view is created from the current window/database, so point the
+    // navigator item at the current database before creating the view.
+    GSErrCode err = ACAPI_Database_GetCurrentDatabase (&navigatorItem.db);
+    if (err != NoError) {
+        return CreateFailedExecutionResult (err, "Failed to read the current database.");
+    }
+
     API_NavigatorView navigatorView = {};
     navigatorView.saveZoom = saveZoom;
 
-    GSErrCode err = ACAPI_Navigator_NewNavigatorView (&navigatorItem, &navigatorView, nullptr, nullptr);
+    err = ACAPI_Navigator_NewNavigatorView (&navigatorItem, &navigatorView, nullptr, nullptr);
     if (err != NoError) {
         return CreateFailedExecutionResult (err, "Failed to create the view. The current window may not be a savable model view.");
     }
 
     GS::ObjectState response;
-    response.Add ("navigatorItemId", CreateIdObjectState ("navigatorItemId", navigatorItem.guid));
+    response.Add ("navigatorItemId", CreateGuidObjectState (navigatorItem.guid));
     return response;
 }
 
